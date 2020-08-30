@@ -107,11 +107,12 @@ struct avr_mmcu_vcd_trace_t {
 	char name[32];
 } __attribute__((__packed__));
 
+// TJ: Remove tag names for C++ compat
 #define AVR_MCU_STRING(_tag, _str) \
 	const struct avr_mmcu_string_t _##_tag _MMCU_ = {\
-		.tag = _tag,\
-		.len = sizeof(struct avr_mmcu_string_t) - 2,\
-		.string = _str,\
+		_tag,\
+		sizeof(struct avr_mmcu_string_t) - 2,\
+		_str,\
 	}
 /*
  * This trick allows concatenation of tokens. We need a macro redirection
