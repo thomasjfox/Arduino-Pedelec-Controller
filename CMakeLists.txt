@@ -31,6 +31,12 @@ project(Pedelec_Controller C CXX)
 
 # Documentation
 option(DOCUMENTATION "Generate API documentation with Doxygen" OFF)
+option(FCSIM_BUILD "Build for fcsim (simavr)" OFF)
+
+if(FCSIM_BUILD)
+   add_definitions(-DFCSIM_BUILD)
+   message(STATUS "Build for fcsim")
+endif(FCSIM_BUILD)
 
 find_package(Doxygen)
 if(DOCUMENTATION AND DOXYGEN_FOUND)

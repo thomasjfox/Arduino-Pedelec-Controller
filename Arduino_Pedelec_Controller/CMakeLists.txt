@@ -8,6 +8,10 @@
 include_directories(BEFORE ${CMAKE_CURRENT_BINARY_DIR}
                     ${CMAKE_SOURCE_DIR}/Arduino_Pedelec_Controller)
 
+if(FCSIM_BUILD)
+    include_directories(${CMAKE_SOURCE_DIR}/tests/simavr/sim/avr)
+endif(FCSIM_BUILD)
+
 set(FIRMWARE_NAME pcontroller)
 
 # special compile flags for the Travis CI environment

@@ -121,6 +121,17 @@ double load=0; //this is the current load
 boolean load_updated=false; //new measurement flag, becomes true if measurement is updated
 #endif
 
+// builds for the FC simulator
+#ifdef FCSIM_BUILD
+  #include "avr_mcu_section.h"
+
+  #if HARDWARE_REV >= 20
+    AVR_MCU(F_CPU, "atmega2560");
+  #else
+    AVR_MCU(F_CPU, "atmega328p");
+  #endif
+#endif
+
 // #define DEBUG_MEMORY_USAGE               // enable this define to print memory usage in SERIAL_MODE_DEBUG
 
 struct savings   //add variables if you want to store additional values to the eeprom
