@@ -1313,6 +1313,8 @@ void serial_debug(HardwareSerial* localSerial)
     localSerial->print(MY_F(" Pedaling"));
     localSerial->print(pedaling);
 #endif
+    localSerial->print(MY_F(" CAD(DBG)"));
+    localSerial->print(cad);
     localSerial->print(MY_F(" Speed"));
     localSerial->print(spd);
     localSerial->print(MY_F(" Brake"));
