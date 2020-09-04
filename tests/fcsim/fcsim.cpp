@@ -26,15 +26,115 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 #include <signal.h>
 
 #include "sim_avr.h"
+#include "sim_time.h"
 #include "sim_elf.h"
 #include "sim_core.h"
 #include "sim_gdb.h"
 #include "sim_hex.h"
 #include "sim_vcd_file.h"
+#include "avr_ioport.h"
 
 #include "sim_core_decl.h"
 
-static avr_t * avr = NULL;
+enum {
+    IRQ_FCSIM_WHEEL = 0,
+    IRQ_FCSIM_PAS,
+    _IRQ_FCSIM_COUNT
+};
+
+static const char *_fcsim_irq_names[_IRQ_FCSIM_COUNT] = {
+    [IRQ_FCSIM_WHEEL] = ">fcsim.wheel",
+    [IRQ_FCSIM_PAS] = ">fcsim.pas",
+};
+
+typedef struct fcsim_irq_t {
+    avr_irq_t *irq;
+    struct avr_t *avr;
+    uint8_t PAS_irq_state;
+} fcsim_irq_t;
+
+#define USECS_PER_SECOND (1000 * 1000)
+
+static avr_cycle_count_t 
+    fcsim_wheel_timer_release(
+        avr_t * avr,
+        avr_cycle_count_t when,
+        void * param)
+{
+    fcsim_irq_t *fcsim_irq = (fcsim_irq_t *) param;
+
+    // fprintf(stderr, "[FCSIM] called: fcsim_wheel_timer_release: %u\n", when);
+
+    avr_raise_irq(fcsim_irq->irq + IRQ_FCSIM_WHEEL, 0);
+
+    return 0;       // do not re-schedule
+}
+
+static avr_cycle_count_t 
+    fcsim_wheel_timer(
+        avr_t * avr,
+        avr_cycle_count_t when,
+        void * param)
+{
+    fcsim_irq_t *fcsim_irq = (fcsim_irq_t *) param;
+
+    // fprintf(stderr, "[FCSIM] called: fcsim_wheel_timer: %u\n", when);
+
+    // wheel timer just cares abour rising edge
+    avr_raise_irq(fcsim_irq->irq + IRQ_FCSIM_WHEEL, 1);
+
+    // schedule wheel IRQ release
+    avr_cycle_timer_register_usec(
+            fcsim_irq->avr,
+            100 /*ms*/ * 1000,
+            fcsim_wheel_timer_release,
+            param);
+
+    // return value is absolute cycle counter for the next call
+    return when + avr_usec_to_cycles(avr, 1600 /* ms */ * 1000);
+}
+
+
+static avr_cycle_count_t 
+    fcsim_pas_timer_release(
+        avr_t * avr,
+        avr_cycle_count_t when,
+        void * param)
+{
+    fcsim_irq_t *fcsim_irq = (fcsim_irq_t *) param;
+
+    // fprintf(stderr, "[FCSIM] called: fcsim_pas_timer_release: %u\n", when);
+
+    fcsim_irq->PAS_irq_state = !fcsim_irq->PAS_irq_state;
+    avr_raise_irq(fcsim_irq->irq + IRQ_FCSIM_PAS, fcsim_irq->PAS_irq_state);
+
+    return 0;       // do not re-schedule
+}
+
+static avr_cycle_count_t 
+    fcsim_pas_timer(
+        avr_t * avr,
+        avr_cycle_count_t when,
+        void * param)
+{
+    fcsim_irq_t *fcsim_irq = (fcsim_irq_t *) param;
+
+    // fprintf(stderr, "[FCSIM] called: fcsim_pas_timer: %u\n", when);
+
+    // PAS IRQ care about rising and falling edge
+    fcsim_irq->PAS_irq_state = !fcsim_irq->PAS_irq_state;
+    avr_raise_irq(fcsim_irq->irq + IRQ_FCSIM_PAS, fcsim_irq->PAS_irq_state);
+
+    // schedule wheel IRQ release
+    avr_cycle_timer_register_usec(
+            fcsim_irq->avr,
+            350 * 1000,
+            fcsim_pas_timer_release,
+            param);
+
+    // return value is absolute cycle counter for the next call
+    return when + avr_usec_to_cycles(avr, 500 /* ms */ * 1000);
+}
 
 int main(int argc, char *argv[])
 {
@@ -52,7 +152,7 @@ int main(int argc, char *argv[])
     strcpy(f.mmcu, "atmega2560");
     f.frequency = 16000000;
 
-    avr = avr_make_mcu_by_name(f.mmcu);
+    avr_t *avr = avr_make_mcu_by_name(f.mmcu);
     if (!avr) {
             fprintf(stderr, "%s: AVR '%s' not known\n", argv[0], f.mmcu);
             exit(1);
@@ -69,6 +169,40 @@ int main(int argc, char *argv[])
     avr_load_firmware(avr, &f);
 
     // TODO: EEPROM from extra file support?
+
+    // init (fake) IRQs
+    fcsim_irq_t fcsim_irq;
+    memset(&fcsim_irq, 0, sizeof(fcsim_irq_t));
+
+    fcsim_irq.irq = avr_alloc_irq(&avr->irq_pool,
+                                  0,    // base
+                                  _IRQ_FCSIM_COUNT,  // total count
+                                  _fcsim_irq_names);
+
+    fcsim_irq.avr = avr;
+
+    // connect virtual IRQ to real INT7 (wheel)
+    avr_connect_irq(
+            fcsim_irq.irq + IRQ_FCSIM_WHEEL,
+            avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('E'), 7));
+
+    avr_connect_irq(
+            fcsim_irq.irq + IRQ_FCSIM_PAS,
+            avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('E'), 5));
+
+    // register periodic wheel timer
+    avr_cycle_timer_register_usec(
+            avr,
+            USECS_PER_SECOND / 2,
+            fcsim_wheel_timer,
+            &fcsim_irq);
+
+    // register periodic PAS timer
+    avr_cycle_timer_register_usec(
+            avr,
+            USECS_PER_SECOND / 2,
+            fcsim_pas_timer,
+            &fcsim_irq);
 
     for (;;) {
         int state = avr_run(avr);
