@@ -196,8 +196,8 @@ const int throttle_in = A3;          //Throttle read-Pin
 const int pas_in = 3;                //PAS Sensor read-Pin
 const int brake_in = 2;              //Brake-In-Pin
 const int switch_thr = 5;            //Throttle-Switch read-Pin
-const int throttle_out = 8;          //Throttle out-Pin
-const int bluetooth_pin = 13;         //Bluetooth-Supply
+const int throttle_out = 13;          //Throttle out-Pin
+const int bluetooth_pin = 8;         //Bluetooth-Supply
 const int switch_disp = 37;           //Display switch
 // Currently not in use as it's hardwired to PORTH, pin 2
 // const int switch_disp_2 = 48;        //second Display switch with Nokia-Display in 4-pin-mode
