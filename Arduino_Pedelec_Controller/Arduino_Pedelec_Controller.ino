@@ -1316,6 +1316,8 @@ void serial_debug(HardwareSerial* localSerial)
 #endif
     localSerial->print(MY_F(" CAD(DBG)"));
     localSerial->print(cad);
+    localSerial->print(MY_F(" MotorOut"));
+    localSerial->print(throttle_write);
     localSerial->print(MY_F(" Speed"));
     localSerial->print(spd);
     localSerial->print(MY_F(" Brake"));
