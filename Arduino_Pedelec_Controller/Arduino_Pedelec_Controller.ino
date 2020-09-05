@@ -124,6 +124,7 @@ boolean load_updated=false; //new measurement flag, becomes true if measurement 
 // builds for the FC simulator
 #ifdef FCSIM_BUILD
   #include "avr_mcu_section.h"
+  #include <avr/sleep.h>
 
   #if HARDWARE_REV >= 20
     AVR_MCU(F_CPU, "atmega2560");
@@ -1587,6 +1588,13 @@ void save_shutdown()
 #if HARDWARE_REV >= 2
   digitalWrite(fet_out,FET_OFF); //turn off
 #endif
+
+#ifdef FCSIM_BUILD
+  // exit simulator
+  cli();
+  sleep_cpu();
+#endif
+
   while(true); //there is nothing more to do -> stay in endless loop until turned off
 
 }
